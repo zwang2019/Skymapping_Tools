@@ -1,18 +1,18 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 
 REQUIRED_PACKAGES = [
     #'numpy',
 ]
 
-PROJECT_NAME = 'skymapper'
+PROJECT_NAME = 'skymapping'
 
 setup(
 
     name = PROJECT_NAME,
     version = VERSION,
-    keywords='skymapping machine learning',
+    keywords='skymapper machine learning',
     description = 'A tool for sequence data classification',
     license = 'Apache 2.0',
     url = 'https://https://github.com/zwang2019/Garvan',
