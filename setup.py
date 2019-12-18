@@ -6,7 +6,7 @@ REQUIRED_PACKAGES = [
     #'numpy',
 ]
 
-PROJECT_NAME = 'skymapping'
+PROJECT_NAME = 'skymapper'
 
 setup(
 
