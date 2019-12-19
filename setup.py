@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.0.2'
+VERSION = '0.0.3'
 
 REQUIRED_PACKAGES = [
-    #'numpy',
+    'scanpy',
 ]
 
 PROJECT_NAME = 'skymapping'
