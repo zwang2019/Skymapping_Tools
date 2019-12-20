@@ -24,6 +24,9 @@ setup(
     install_requires = REQUIRED_PACKAGES,
     #zip_safe=False,
 
+    # control the users python version
+    python_requires='>=3.6',
+
     # PyPI package information.
     classifiers=[
         # How mature is this project? Common values are
