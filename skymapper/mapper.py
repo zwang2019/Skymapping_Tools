@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 
 import os
+import platform
+from copy import deepcopy
+import re
+import csv
+import time
+import configparser
 import math
+
 import scanpy as sc
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 from matplotlib import rcParams
-
+from sklearn.utils import shuffle
 
 ' initialize the raw sequence data '
 
@@ -30,6 +37,11 @@ class Initialization(object):
         self.dim = 0  # Actually, this is a buffer to reduce the calculation.
         self.buffer = 1200  # same method to reduce the calculation
         self.method = 'union'  # same method to reduce the calculation
+
+        self.result = {}  # to prepare the data.
+        self.train_size = 6000
+        self.test_size = 4000
+        self.test_val_split = 0.5
 
         self.x = x  # A standby viable(should not use this)
 
@@ -129,13 +141,53 @@ class Initialization(object):
                 plt.show()
 
     def make_sample_video(self, prefix='skymap-', suffix='.png', output_name='skymap.mp4'):
-        os.system("ffmpeg -y -r 10 -f image2  -pattern_type glob -i '%s*%s' -crf 25 -s 1440x600 -pix_fmt yuv420p %s" % (prefix, suffix, output_name))
+        os.system("ffmpeg -y -r 10 -f image2  -pattern_type glob -i '%s*%s' -crf 25 -s 1440x600 -pix_fmt yuv420p %s" % (
+            prefix, suffix, output_name))
 
+    #### Prepare_Data ####
 
+    def prep_result(self):
+        for name in self.names:
+            self.result[name] = []
+            for index, sc_data in enumerate(self.adata[name].X):
+                self.result[name].append([self.name_of(self.adata[name], index), self.to_matrix(sc_data)])
 
+    def transform(self, mat):
+        exp = np.dstack(mat).transpose()
+        return np.expand_dims(exp, axis=1)
 
+    def one_hot(self, len, num):
+        one_hot = [0] * len
+        one_hot[num - 1] = 1
+        return one_hot
 
+    def set_train_size(self, train_size, test_size, test_val_split):
+        self.train_size = train_size
+        self.test_size = test_size
+        self.test_val_split = test_val_split
 
+    def prep_data(self, in_labels, raw_data, desired_size, y_value, shuffle_data=False):
+        num_classes = len(self.names)
+        data = deepcopy(raw_data)
+        labels = deepcopy(in_labels)
+        if shuffle_data:
+            labels, data = shuffle(in_labels, data)
+        data = data[0:desired_size]
+        labels = labels[0:desired_size]
+        results = np.empty((len(data), num_classes))
+        results[0:len(data)] = y_value
+        return labels, data, results
 
-
-
+    def split_train_test(self, in_labels, in_data, label_index):
+        num_classes = len(self.names)
+        labels, data, exp_values = self.prep_data(in_labels[:, 0], in_data, self.train_size, self.one_hot(num_classes, label_index),
+                                                  shuffle_data=True)
+        label_tr = labels
+        x_tr = data
+        y_tr = exp_values
+        labels, data, exp_values = prep_data(in_labels[:, 0][train_size:], in_data[train_size:], test_size,
+                                             one_hot(num_classes, index), shuffle_data=False)
+        label_tst = labels
+        x_tst = np.array(data)
+        y_tst = exp_values
+        return (label_tr, x_tr, y_tr, label_tst, x_tst, y_tst)
