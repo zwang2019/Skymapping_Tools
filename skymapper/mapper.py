@@ -156,8 +156,8 @@ class Initialization(object):
         exp = np.dstack(mat).transpose()
         return np.expand_dims(exp, axis=1)
 
-    def one_hot(self, len, num):
-        one_hot = [0] * len
+    def one_hot(self, lens, num):
+        one_hot = [0] * lens
         one_hot[num - 1] = 1
         return one_hot
 
@@ -185,9 +185,60 @@ class Initialization(object):
         label_tr = labels
         x_tr = data
         y_tr = exp_values
-        labels, data, exp_values = prep_data(in_labels[:, 0][train_size:], in_data[train_size:], test_size,
-                                             one_hot(num_classes, index), shuffle_data=False)
+        labels, data, exp_values = self.prep_data(in_labels[:, 0][self.train_size:], in_data[self.train_size:], self.test_size,
+                                             self.one_hot(num_classes, label_index), shuffle_data=False)
         label_tst = labels
         x_tst = np.array(data)
         y_tst = exp_values
-        return (label_tr, x_tr, y_tr, label_tst, x_tst, y_tst)
+        return label_tr, x_tr, y_tr, label_tst, x_tst, y_tst
+
+    def prepare(self):
+        self.prep_result()
+        for index, name in enumerate(self.names):
+            data_for_name = np.array(self.result[name])
+            matrices = self.transform(data_for_name[:, 1])
+            shdmn = matrices.mean(axis=0)
+            shdmn = shdmn[0, :, :]
+            self.show_skymap(shdmn)
+            print(name, "=", data_for_name.shape, ' ', matrices.shape)
+            if index == 0:
+                LX, X, y, LX_test, X_test, Y_test = split_train_test(data_for_name, matrices, 1)
+            else:
+                t_LX, t_X, t_y, t_LX_test, t_X_test, t_Y_test = split_train_test(data_for_name, matrices, 1)
+                LX = np.append(LX, t_LX, axis=0)
+                X = np.append(X, t_X, axis=0)
+                y = np.append(y, t_y, axis=0)
+                LX_test = np.append(LX_test, t_LX_test, axis=0)
+                X_test = np.append(X_test, t_X_test, axis=0)
+                Y_test = np.append(Y_test, t_Y_test, axis=0)
+            print('lx,x,y, lxt, x_test y_test shapes=', LX.shape, X.shape, y.shape, len(LX_test), X_test.shape,
+                  Y_test.shape)
+
+        LX_test, X_test, Y_test = shuffle(LX_test, X_test, Y_test)
+        split_point = int(len(X_test) * test_val_split)
+        print("splitting at=", split_point)
+        LX_validation = LX_test[split_point:]
+        X_validation = X_test[split_point:]
+        Y_validation = Y_test[split_point:]
+        LX_test = LX_test[0:split_point]
+        X_test = X_test[0:split_point]
+        Y_test = Y_test[0:split_point]
+
+        print('Tst LX=', len(LX_test))
+        print('Tst X=', X_test.shape)
+        print('Tst y=', Y_test.shape)
+        print('Val LX=', len(LX_validation))
+        print('Val X=', X_validation.shape)
+        print('Val y=', Y_validation.shape)
+
+
+
+
+
+class Formatter(object):
+    def __init__(self, im):
+        self.im = im
+
+    def __call__(self, x, y):
+        label=label_for_pix(y,x)#+' '+adata[names[3]].var.iloc[index,0]
+        return '{}'.format(label)
