@@ -214,9 +214,9 @@ class Initialization(object):
             self.show_skymap(shdmn)
             print(name, "=", data_for_name.shape, ' ', matrices.shape)
             if index == 0:
-                LX, X, y, LX_test, X_test, Y_test = split_train_test(data_for_name, matrices, 1)
+                LX, X, y, LX_test, X_test, Y_test = self.split_train_test(data_for_name, matrices, 1)
             else:
-                t_LX, t_X, t_y, t_LX_test, t_X_test, t_Y_test = split_train_test(data_for_name, matrices, 1)
+                t_LX, t_X, t_y, t_LX_test, t_X_test, t_Y_test = self.split_train_test(data_for_name, matrices, 1)
                 LX = np.append(LX, t_LX, axis=0)
                 X = np.append(X, t_X, axis=0)
                 y = np.append(y, t_y, axis=0)
@@ -227,7 +227,7 @@ class Initialization(object):
                   Y_test.shape)
 
         LX_test, X_test, Y_test = shuffle(LX_test, X_test, Y_test)
-        split_point = int(len(X_test) * test_val_split)
+        split_point = int(len(X_test) * self.test_val_split)
         print("splitting at=", split_point)
         LX_validation = LX_test[split_point:]
         X_validation = X_test[split_point:]
@@ -242,9 +242,6 @@ class Initialization(object):
         print('Val LX=', len(LX_validation))
         print('Val X=', X_validation.shape)
         print('Val y=', Y_validation.shape)
-
-
-
 
 
 class Formatter(object):
