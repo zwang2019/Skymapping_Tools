@@ -144,6 +144,18 @@ class Initialization(object):
         os.system("ffmpeg -y -r 10 -f image2  -pattern_type glob -i '%s*%s' -crf 25 -s 1440x600 -pix_fmt yuv420p %s" % (
             prefix, suffix, output_name))
 
+    def show_skymap(self, mat):
+        pix_labels = self.adata[self.names[0]].var
+        fig, ax = plt.subplots()
+        #    plt.rcParams["figure.figsize"] = (12,12)
+        im = ax.imshow(mat, interpolation='none')
+        ax.format_coord = Formatter(im, self.dim, pix_labels)
+        plt.axis('off')
+        plt.grid(b=None)
+        plt.show()
+    # show_skymap(mat)
+
+
     #### Prepare_Data ####
 
     def prep_result(self):
@@ -236,9 +248,18 @@ class Initialization(object):
 
 
 class Formatter(object):
-    def __init__(self, im):
+    def __init__(self, im, dim, pix_labels):
         self.im = im
+        self.dim = dim
+        self.pix_labels = pix_labels
 
     def __call__(self, x, y):
-        label=label_for_pix(y,x)#+' '+adata[names[3]].var.iloc[index,0]
+        label = self.label_for_pix(y, x)  # +' '+adata[names[3]].var.iloc[index,0]
         return '{}'.format(label)
+
+    def label_for_pix(self, x, y):
+        label = ''
+        index = int(x) * self.dim + int(y)
+        if index < len(self.pix_labels):
+            label = self.pix_labels.iloc[index].name
+        return label
