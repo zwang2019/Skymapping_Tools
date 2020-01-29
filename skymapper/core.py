@@ -62,6 +62,8 @@ class Initialization(object):
         self.choose_gpu = []
         self.run = 'CD4Subtypes-TestRun9'
 
+        self.data_augmentation = False
+        self.subtract_pixel_mean = False
 
         self.x = x  # A standby viable(should not use this)
 
@@ -263,18 +265,18 @@ class Initialization(object):
         print('Val X=', self.X_validation.shape)
         print('Val y=', self.Y_validation.shape)
 
-        # return X, X_test, X_validation, y, Y_test, Y_validation
+        # return self.X, self.X_test, self.X_validation, self.y, self.Y_test, self.Y_validation
 
     def train(self, X_train, X_test, X_validation, Y_train, Y_test, Y_validation, version=2, depth=20, epochs=60):
 
         strategy = tf.distribute.MirroredStrategy()
         if self.choose_gpu is not []:
             # devices:
-            get_gpu(choose_gpu)
+            get_gpu(self.choose_gpu)
             print(_get_available_devices())
             print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
 
-        gpus = len(choose_gpu)
+        gpus = len(self.choose_gpu)
 
         tensorboard = TensorBoard(log_dir="log-full/{}".format(time.time()))
 
@@ -283,26 +285,22 @@ class Initialization(object):
             batch_size = 32
         else:
             batch_size = 32 * gpus  # multiply by number of GPUs
-        data_augmentation = False
-
-        # Subtracting pixel mean improves accuracy
-        subtract_pixel_mean = False
 
         # Model name, depth and version
         model_type = 'UResNet%dv%d' % (depth, version)
         print('model_type=', model_type)
         # Input image dimensions.
 
-        input_shape = X_train.shape[1:]
+        input_shape = self.X.shape[1:]
         print('input_shape=', input_shape)
 
         # Normalize data.
-        x_train = X_train.astype('float32') / 173
-        x_test = X_test.astype('float32') / 173
-        x_validation = X_validation.astype('float32') / 173
+        x_train = self.X.astype('float32') / 173
+        x_test = self.X_test.astype('float32') / 173
+        x_validation = self.X_validation.astype('float32') / 173
 
         # If subtract pixel mean is enabled
-        if subtract_pixel_mean:
+        if self.subtract_pixel_mean:
             x_train_mean = np.mean(x_train, axis=0)
             print(x_train_mean)
             x_train -= x_train_mean
@@ -313,12 +311,12 @@ class Initialization(object):
         print(x_train.shape[0], 'train samples')
         print(x_test.shape[0], 'test samples')
         print(x_validation.shape[0], 'validation samples')
-        print('y_train shape:', Y_train.shape)
+        print('y_train shape:', self.y.shape)
 
         # Convert class vectors to binary class matrices.
-        y_train = Y_train  # keras.utils.to_categorical(Y_train, num_classes)
-        y_test = Y_test  # keras.utils.to_categorical(Y_test, num_classes)
-        y_validation = Y_validation
+        y_train = self.y  # keras.utils.to_categorical(Y_train, num_classes)
+        y_test = self.Y_test  # keras.utils.to_categorical(Y_test, num_classes)
+        y_validation = self.Y_validation
 
         try:
             # if gpus > 1:
@@ -366,7 +364,7 @@ class Initialization(object):
 
             # Prepare model model saving directory.
             save_dir = os.path.join(os.getcwd(), 'saved_models')
-            model_name = run + '_newdata_sc_%s_model.{epoch:03d}.h5' % model_type
+            model_name = self.run + '_newdata_sc_%s_model.{epoch:03d}.h5' % model_type
             if not os.path.isdir(save_dir):
                 os.makedirs(save_dir)
             filepath = os.path.join(save_dir, model_name)
@@ -387,7 +385,7 @@ class Initialization(object):
             callbacks = [tensorboard, checkpoint, lr_reducer, lr_scheduler]
 
             # Run training, with or without data augmentation.
-            if not data_augmentation:
+            if not self.data_augmentation:
                 print('Not using data augmentation.')
                 history = model.fit(x_train, y_train,
                                     batch_size=batch_size,
@@ -456,12 +454,6 @@ class Initialization(object):
             print('Error:', str(e))
             let_tansel_know("Training error=" + str(e)[0:1300])
         let_tansel_know("Training finished")
-
-
-
-
-
-
 
 
 
