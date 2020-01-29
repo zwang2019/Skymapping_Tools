@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 from matplotlib import rcParams
 from sklearn.utils import shuffle
+import skymapper.skymapper_trainer
+
+
 
 ' initialize the raw sequence data '
 
@@ -214,34 +217,53 @@ class Initialization(object):
             self.show_skymap(shdmn)
             print(name, "=", data_for_name.shape, ' ', matrices.shape)
             if index == 0:
-                LX, X, y, LX_test, X_test, Y_test = self.split_train_test(data_for_name, matrices, 1)
+                self.LX, self.X, self.y, self.LX_test, self.X_test, self.Y_test = self.split_train_test(data_for_name, matrices, 1)
             else:
-                t_LX, t_X, t_y, t_LX_test, t_X_test, t_Y_test = self.split_train_test(data_for_name, matrices, 1)
-                LX = np.append(LX, t_LX, axis=0)
-                X = np.append(X, t_X, axis=0)
-                y = np.append(y, t_y, axis=0)
-                LX_test = np.append(LX_test, t_LX_test, axis=0)
-                X_test = np.append(X_test, t_X_test, axis=0)
-                Y_test = np.append(Y_test, t_Y_test, axis=0)
-            print('lx,x,y, lxt, x_test y_test shapes=', LX.shape, X.shape, y.shape, len(LX_test), X_test.shape,
-                  Y_test.shape)
+                self.t_LX, self.t_X, self.t_y, self.t_LX_test, self.t_X_test, self.t_Y_test = self.split_train_test(data_for_name, matrices, 1)
+                self.LX = np.append(self.LX, self.t_LX, axis=0)
+                self.X = np.append(self.X, self.t_X, axis=0)
+                self.y = np.append(self.y, self.t_y, axis=0)
+                self.LX_test = np.append(self.LX_test, self.t_LX_test, axis=0)
+                self.X_test = np.append(self.X_test, self.t_X_test, axis=0)
+                self.Y_test = np.append(self.Y_test, self.t_Y_test, axis=0)
+            print('lx,x,y, lxt, x_test y_test shapes=', self.LX.shape, self.X.shape, self.y.shape, len(self.LX_test), self.X_test.shape,
+                  self.Y_test.shape)
 
-        LX_test, X_test, Y_test = shuffle(LX_test, X_test, Y_test)
-        split_point = int(len(X_test) * self.test_val_split)
+        self.LX_test, self.X_test, self.Y_test = shuffle(self.LX_test, self.X_test, self.Y_test)
+        split_point = int(len(self.X_test) * self.test_val_split)
         print("splitting at=", split_point)
-        LX_validation = LX_test[split_point:]
-        X_validation = X_test[split_point:]
-        Y_validation = Y_test[split_point:]
-        LX_test = LX_test[0:split_point]
-        X_test = X_test[0:split_point]
-        Y_test = Y_test[0:split_point]
+        self.LX_validation = self.LX_test[split_point:]
+        self.X_validation = self.X_test[split_point:]
+        self.Y_validation = self.Y_test[split_point:]
+        self.LX_test = self.LX_test[0:split_point]
+        self.X_test = self.X_test[0:split_point]
+        self.Y_test = self.Y_test[0:split_point]
 
-        print('Tst LX=', len(LX_test))
-        print('Tst X=', X_test.shape)
-        print('Tst y=', Y_test.shape)
-        print('Val LX=', len(LX_validation))
-        print('Val X=', X_validation.shape)
-        print('Val y=', Y_validation.shape)
+        print('Tst LX=', len(self.LX_test))
+        print('Tst X=', self.X_test.shape)
+        print('Tst y=', self.Y_test.shape)
+        print('Val LX=', len(self.LX_validation))
+        print('Val X=', self.X_validation.shape)
+        print('Val y=', self.Y_validation.shape)
+
+    def
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Formatter(object):

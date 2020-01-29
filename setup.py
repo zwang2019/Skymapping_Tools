@@ -1,12 +1,13 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.0.5'
+VERSION = '0.5.0'
 
 REQUIRED_PACKAGES = [
+    'tensorflow == 2.1.0',
     'scanpy',
 ]
 
-PROJECT_NAME = 'skymapping'
+PROJECT_NAME = 'skymapping_tools'
 
 setup(
 
@@ -49,8 +50,6 @@ setup(
 
         # Specify the Python versions you support here.
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],

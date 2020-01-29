@@ -310,12 +310,15 @@ def let_tansel_know(str):
 
 
 def train(X_train, X_test, X_validation, Y_train, Y_test, Y_validation, version=2, depth=20, epochs=60):
-    strategy = tf.distribute.MirroredStrategy()
 
-    # devices:
-    get_gpu(choose_gpu)
-    print(_get_available_devices())
-    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+    strategy = tf.distribute.MirroredStrategy()
+    if choose_gpu is not []:
+
+        # devices:
+        get_gpu(choose_gpu)
+        print(_get_available_devices())
+        print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+
     gpus = len(choose_gpu)
 
     tensorboard = TensorBoard(log_dir="log-full/{}".format(time.time()))
