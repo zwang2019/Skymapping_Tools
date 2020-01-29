@@ -13,8 +13,8 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRat
 from tensorflow.python.client import device_lib
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.utils import multi_gpu_model
-from tensorflow.keras import backend as K
+# from tensorflow.keras.utils import multi_gpu_model
+# from tensorflow.keras import backend as K
 
 choose_gpu = []
 run = 'CD4Subtypes-TestRun9'

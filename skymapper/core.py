@@ -16,7 +16,18 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 from matplotlib import rcParams
 from sklearn.utils import shuffle
-import skymapper.skymapper_trainer
+import tensorflow as tf
+
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Conv2D, AveragePooling2D, BatchNormalization, Flatten, Dense, Input, Activation
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.models import Model
+# from tensorflow.keras.utils import plot_model
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau
+from tensorflow.python.client import device_lib
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import skymapper.skymapper_trainer as st
 
 
 
@@ -45,6 +56,10 @@ class Initialization(object):
         self.train_size = 6000
         self.test_size = 4000
         self.test_val_split = 0.5
+
+        self.choose_gpu = []
+        self.run = 'CD4Subtypes-TestRun9'
+
 
         self.x = x  # A standby viable(should not use this)
 
@@ -246,10 +261,199 @@ class Initialization(object):
         print('Val X=', self.X_validation.shape)
         print('Val y=', self.Y_validation.shape)
 
-    def
+    # return X, X_test, X_validation, y, Y_test, Y_validation
 
+    def train(self, X_train, X_test, X_validation, Y_train, Y_test, Y_validation, version=2, depth=20, epochs=60):
 
+        strategy = tf.distribute.MirroredStrategy()
+        if self.choose_gpu is not []:
+            # devices:
+            st.get_gpu(self.choose_gpu)
+            print(st._get_available_devices())
+            print('Number of devices: {}'.format(strategy.num_replicas_in_sync))   # may have problem
 
+        gpus = len(self.choose_gpu)
+
+        tensorboard = TensorBoard(log_dir="log-full/{}".format(time.time()))
+
+        # Training parameters
+        if gpus == 0:
+            batch_size = 32
+        else:
+            batch_size = 32 * gpus  # multiply by number of GPUs
+        data_augmentation = False
+
+        # Subtracting pixel mean improves accuracy
+        subtract_pixel_mean = False
+
+        # Model name, depth and version
+        model_type = 'UResNet%dv%d' % (depth, version)
+        print('model_type=', model_type)
+        # Input image dimensions.
+
+        input_shape = X_train.shape[1:]
+        print('input_shape=', input_shape)
+
+        # Normalize data.
+        x_train = X_train.astype('float32') / 173
+        x_test = X_test.astype('float32') / 173
+        x_validation = X_validation.astype('float32') / 173
+
+        # If subtract pixel mean is enabled
+        if subtract_pixel_mean:
+            x_train_mean = np.mean(x_train, axis=0)
+            print(x_train_mean)
+            x_train -= x_train_mean
+            x_test -= x_train_mean
+            x_validation -= x_train_mean
+
+        print('x_train shape:', x_train.shape)
+        print(x_train.shape[0], 'train samples')
+        print(x_test.shape[0], 'test samples')
+        print(x_validation.shape[0], 'validation samples')
+        print('y_train shape:', Y_train.shape)
+
+        # Convert class vectors to binary class matrices.
+        y_train = Y_train  # keras.utils.to_categorical(Y_train, num_classes)
+        y_test = Y_test  # keras.utils.to_categorical(Y_test, num_classes)
+        y_validation = Y_validation
+
+        try:
+            # if gpus > 1:
+            #    with tf.device("/cpu:0"):
+            #        if version == 2:
+            #            model = resnet_v2(input_shape=input_shape, depth=depth)
+            #        else:
+            #            model = resnet_v1(input_shape=input_shape, depth=depth)
+            # else:
+            #    if version == 2:
+            #        model = resnet_v2(input_shape=input_shape, depth=depth)
+            #    else:
+            #        model = resnet_v1(input_shape=input_shape, depth=depth)
+            # model.summary()
+            #    plot_model(model, to_file='model_plot.svg', show_shapes=True, show_layer_names=True)
+            # if gpus > 1:
+            #    model = multi_gpu_model(model, gpus=gpus, cpu_merge=False)
+
+            if gpus >= 1:
+                with strategy.scope():
+                    if version == 2:
+                        model = resnet_v2(input_shape=input_shape, depth=depth)
+                    else:
+                        model = resnet_v1(input_shape=input_shape, depth=depth)
+
+                    model.summary()
+
+                    model.compile(loss='categorical_crossentropy',
+                                  optimizer=Adam(lr=lr_schedule(0)),
+                                  metrics=['accuracy'])
+
+            else:
+                if version == 2:
+                    model = resnet_v2(input_shape=input_shape, depth=depth)
+                else:
+                    model = resnet_v1(input_shape=input_shape, depth=depth)
+
+                model.summary()
+
+                model.compile(loss='categorical_crossentropy',
+                              optimizer=Adam(lr=lr_schedule(0)),
+                              metrics=['accuracy'])
+
+            print(model_type)
+
+            # Prepare model model saving directory.
+            save_dir = os.path.join(os.getcwd(), 'saved_models')
+            model_name = run + '_newdata_sc_%s_model.{epoch:03d}.h5' % model_type
+            if not os.path.isdir(save_dir):
+                os.makedirs(save_dir)
+            filepath = os.path.join(save_dir, model_name)
+
+            # Prepare callbacks for model saving and for learning rate adjustment.
+            checkpoint = ModelCheckpoint(filepath=filepath,
+                                         monitor='val_accuracy',
+                                         verbose=1,
+                                         save_best_only=True)
+
+            lr_scheduler = LearningRateScheduler(lr_schedule)
+
+            lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
+                                           cooldown=0,
+                                           patience=5,
+                                           min_lr=0.5e-6)
+
+            callbacks = [tensorboard, checkpoint, lr_reducer, lr_scheduler]
+
+            # Run training, with or without data augmentation.
+            if not data_augmentation:
+                print('Not using data augmentation.')
+                history = model.fit(x_train, y_train,
+                                    batch_size=batch_size,
+                                    epochs=epochs,
+                                    #              steps_per_epoch=batch_size,
+                                    validation_data=(x_test, y_test),
+                                    #              validation_steps=1,
+                                    shuffle=True,
+                                    callbacks=callbacks)
+            else:
+                print('Using real-time data augmentation.')
+                # This will do preprocessing and realtime data augmentation:
+                datagen = ImageDataGenerator(
+                    # set input mean to 0 over the dataset
+                    featurewise_center=False,
+                    # set each sample mean to 0
+                    samplewise_center=False,
+                    # divide inputs by std of dataset
+                    featurewise_std_normalization=False,
+                    # divide each input by its std
+                    # samplewise_s1td_normalization=False,
+                    # apply ZCA whitening
+                    zca_whitening=False,
+                    # epsilon for ZCA whitening
+                    zca_epsilon=0,
+                    # randomly rotate images in the range (deg 0 to 180)
+                    rotation_range=0,
+                    # randomly shift images horizontally
+                    width_shift_range=0.1,
+                    # randomly shift images vertically
+                    height_shift_range=0.1,
+                    # set range for random shear
+                    shear_range=0.,
+                    # set range for random zoom
+                    zoom_range=0.,
+                    # set range for random channel shifts
+                    channel_shift_range=0.,
+                    # set mode for filling points outside the input boundaries
+                    fill_mode='nearest',
+                    # value used for fill_mode = "constant"
+                    cval=0.,
+                    # randomly flip images
+                    horizontal_flip=False,
+                    # randomly flip images
+                    vertical_flip=False,
+                    # set rescaling factor (applied before any other transformation)
+                    rescale=None,
+                    # set function that will be applied on each input
+                    preprocessing_function=None,
+                    # image data format, either "channels_first" or "channels_last"
+                    data_format=None,
+                    # fraction of images reserved for validation (strictly between 0 and 1)
+                    validation_split=0.0)
+
+                # Compute quantities required for featurewise normalization
+                # (std, meadata = adata[:, adata.var['highly_variable']]adata = adata[:, adata.var['highly_variable']]an, and principal components if ZCA whitening is applied).
+                datagen.fit(x_train)
+
+                # Fit the model on the batches generated by datagen.flow().
+                history = model.fit(datagen.flow(x_train, y_train, batch_size=batch_size),
+                                    validation_data=(x_test, y_test),
+                                    epochs=epochs, verbose=1, workers=4,
+                                    steps_per_epoch=batch_size,
+                                    callbacks=callbacks)
+        except Exception as e:
+            print('Error:', str(e))
+            let_tansel_know("Training error=" + str(e)[0:1300])
+        let_tansel_know("Training finished")
 
 
 
