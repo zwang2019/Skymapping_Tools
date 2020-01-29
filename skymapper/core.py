@@ -267,7 +267,7 @@ class Initialization(object):
 
         # return self.X, self.X_test, self.X_validation, self.y, self.Y_test, self.Y_validation
 
-    def train(self, X_train, X_test, X_validation, Y_train, Y_test, Y_validation, version=2, depth=20, epochs=60):
+    def train(self, version=2, depth=20, epochs=60):
 
         strategy = tf.distribute.MirroredStrategy()
         if self.choose_gpu is not []:
