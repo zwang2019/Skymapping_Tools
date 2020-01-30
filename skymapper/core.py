@@ -27,10 +27,10 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, LearningRat
 from tensorflow.python.client import device_lib
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import load_model
+
 # from tensorflow.keras.utils import multi_gpu_model
 # from tensorflow.keras import backend as K
-
-
 
 
 ' initialize the raw sequence data '
@@ -175,8 +175,8 @@ class Initialization(object):
         plt.axis('off')
         plt.grid(b=None)
         plt.show()
-    # show_skymap(mat)
 
+    # show_skymap(mat)
 
     #### Prepare_Data ####
 
@@ -214,13 +214,15 @@ class Initialization(object):
 
     def split_train_test(self, in_labels, in_data, label_index):
         num_classes = len(self.names)
-        labels, data, exp_values = self.prep_data(in_labels[:, 0], in_data, self.train_size, self.one_hot(num_classes, label_index),
+        labels, data, exp_values = self.prep_data(in_labels[:, 0], in_data, self.train_size,
+                                                  self.one_hot(num_classes, label_index),
                                                   shuffle_data=True)
         label_tr = labels
         x_tr = data
         y_tr = exp_values
-        labels, data, exp_values = self.prep_data(in_labels[:, 0][self.train_size:], in_data[self.train_size:], self.test_size,
-                                             self.one_hot(num_classes, label_index), shuffle_data=False)
+        labels, data, exp_values = self.prep_data(in_labels[:, 0][self.train_size:], in_data[self.train_size:],
+                                                  self.test_size,
+                                                  self.one_hot(num_classes, label_index), shuffle_data=False)
         label_tst = labels
         x_tst = np.array(data)
         y_tst = exp_values
@@ -236,16 +238,19 @@ class Initialization(object):
             self.show_skymap(shdmn)
             print(name, "=", data_for_name.shape, ' ', matrices.shape)
             if index == 0:
-                self.LX, self.X, self.y, self.LX_test, self.X_test, self.Y_test = self.split_train_test(data_for_name, matrices, 1)
+                self.LX, self.X, self.y, self.LX_test, self.X_test, self.Y_test = self.split_train_test(data_for_name,
+                                                                                                        matrices, 1)
             else:
-                self.t_LX, self.t_X, self.t_y, self.t_LX_test, self.t_X_test, self.t_Y_test = self.split_train_test(data_for_name, matrices, 1)
+                self.t_LX, self.t_X, self.t_y, self.t_LX_test, self.t_X_test, self.t_Y_test = self.split_train_test(
+                    data_for_name, matrices, 1)
                 self.LX = np.append(self.LX, self.t_LX, axis=0)
                 self.X = np.append(self.X, self.t_X, axis=0)
                 self.y = np.append(self.y, self.t_y, axis=0)
                 self.LX_test = np.append(self.LX_test, self.t_LX_test, axis=0)
                 self.X_test = np.append(self.X_test, self.t_X_test, axis=0)
                 self.Y_test = np.append(self.Y_test, self.t_Y_test, axis=0)
-            print('lx,x,y, lxt, x_test y_test shapes=', self.LX.shape, self.X.shape, self.y.shape, len(self.LX_test), self.X_test.shape,
+            print('lx,x,y, lxt, x_test y_test shapes=', self.LX.shape, self.X.shape, self.y.shape, len(self.LX_test),
+                  self.X_test.shape,
                   self.Y_test.shape)
 
         self.LX_test, self.X_test, self.Y_test = shuffle(self.LX_test, self.X_test, self.Y_test)
@@ -387,14 +392,14 @@ class Initialization(object):
             # Run training, with or without data augmentation.
             if not self.data_augmentation:
                 print('Not using data augmentation.')
-                history = model.fit(x_train, y_train,
-                                    batch_size=batch_size,
-                                    epochs=epochs,
-                                    #              steps_per_epoch=batch_size,
-                                    validation_data=(x_test, y_test),
-                                    #              validation_steps=1,
-                                    shuffle=True,
-                                    callbacks=callbacks)
+                self.history = model.fit(x_train, y_train,
+                                         batch_size=batch_size,
+                                         epochs=epochs,
+                                         #              steps_per_epoch=batch_size,
+                                         validation_data=(x_test, y_test),
+                                         #              validation_steps=1,
+                                         shuffle=True,
+                                         callbacks=callbacks)
             else:
                 print('Using real-time data augmentation.')
                 # This will do preprocessing and realtime data augmentation:
@@ -445,7 +450,7 @@ class Initialization(object):
                 datagen.fit(x_train)
 
                 # Fit the model on the batches generated by datagen.flow().
-                history = model.fit(datagen.flow(x_train, y_train, batch_size=batch_size),
+                self.history = model.fit(datagen.flow(x_train, y_train, batch_size=batch_size),
                                     validation_data=(x_test, y_test),
                                     epochs=epochs, verbose=1, workers=4,
                                     steps_per_epoch=batch_size,
@@ -454,6 +459,59 @@ class Initialization(object):
             print('Error:', str(e))
             let_tansel_know("Training error=" + str(e)[0:1300])
         let_tansel_know("Training finished")
+
+    def analyze(self):
+
+        mpl.rcParams['figure.figsize'] = [8.0, 6.0]
+        mpl.rcParams['figure.dpi'] = 80
+        mpl.rcParams['savefig.dpi'] = 100
+
+        mpl.rcParams['font.size'] = 14
+        mpl.rcParams['legend.fontsize'] = 'large'
+        mpl.rcParams['figure.titlesize'] = 'medium'
+
+
+        # Measure accuracy
+        plt.plot(self.history.history['accuracy'])                #acc or val_acc may cause problems
+        plt.plot(self.history.history['val_accuracy'])
+        plt.title('Model accuracy')
+        plt.ylabel('Accuracy')
+        plt.xlabel('Epoch')
+        plt.legend(['Train', 'Test'], loc='upper left')
+        plt.savefig("accuracy.svg", format="svg")
+        plt.show()
+
+        # Plot training & validation loss values
+        plt.plot(self.history.history['loss'])
+        plt.plot(self.history.history['val_loss'])
+        plt.title('Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.legend(['Train', 'Test'], loc='upper left')
+        plt.savefig("loss.svg", format="svg")
+        plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -476,6 +534,7 @@ class Formatter(object):
         if index < len(self.pix_labels):
             label = self.pix_labels.iloc[index].name
         return label
+
 
 ### training fuction ###
 
@@ -766,12 +825,3 @@ def _get_available_devices():
 
 def let_tansel_know(str):
     print(str)
-
-
-
-
-
-
-
-
-
