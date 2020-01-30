@@ -11,13 +11,14 @@ import math
 
 import scanpy as sc
 import numpy as np
+import pandas as pd
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 from matplotlib import rcParams
-from sklearn.utils import shuffle
-import tensorflow as tf
 
+import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.layers import Conv2D, AveragePooling2D, BatchNormalization, Flatten, Dense, Input, Activation
 from tensorflow.keras.regularizers import l2
@@ -32,6 +33,17 @@ from tensorflow.keras.models import load_model
 # from tensorflow.keras.utils import multi_gpu_model
 # from tensorflow.keras import backend as K
 
+from sklearn.utils import shuffle
+from sklearn.metrics import roc_curve, auc
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import label_binarize
+from sklearn.multiclass import OneVsRestClassifier
+from numpy import interp
+
+
+from pycm import *
+import seaborn as sn
+from itertools import cycle
 
 ' initialize the raw sequence data '
 
@@ -276,6 +288,8 @@ class Initialization(object):
 
     def train(self, version=2, depth=20, epochs=60):
 
+        num_classes = len(self.names)
+
         strategy = tf.distribute.MirroredStrategy()
         if self.choose_gpu is not []:
             # devices:
@@ -302,28 +316,28 @@ class Initialization(object):
         print('input_shape=', input_shape)
 
         # Normalize data.
-        x_train = self.X.astype('float32') / 173
-        x_test = self.X_test.astype('float32') / 173
-        x_validation = self.X_validation.astype('float32') / 173
+        self.x_train = self.X.astype('float32') / 173
+        self.x_test = self.X_test.astype('float32') / 173
+        self.x_validation = self.X_validation.astype('float32') / 173
 
         # If subtract pixel mean is enabled
         if self.subtract_pixel_mean:
-            x_train_mean = np.mean(x_train, axis=0)
+            x_train_mean = np.mean(self.x_train, axis=0)
             print(x_train_mean)
-            x_train -= x_train_mean
-            x_test -= x_train_mean
-            x_validation -= x_train_mean
+            self.x_train -= x_train_mean
+            self.x_test -= x_train_mean
+            self.x_validation -= x_train_mean
 
-        print('x_train shape:', x_train.shape)
-        print(x_train.shape[0], 'train samples')
-        print(x_test.shape[0], 'test samples')
-        print(x_validation.shape[0], 'validation samples')
+        print('x_train shape:', self.x_train.shape)
+        print(self.x_train.shape[0], 'train samples')
+        print(self.x_test.shape[0], 'test samples')
+        print(self.x_validation.shape[0], 'validation samples')
         print('y_train shape:', self.y.shape)
 
         # Convert class vectors to binary class matrices.
-        y_train = self.y  # keras.utils.to_categorical(Y_train, num_classes)
-        y_test = self.Y_test  # keras.utils.to_categorical(Y_test, num_classes)
-        y_validation = self.Y_validation
+        self.y_train = self.y  # keras.utils.to_categorical(Y_train, num_classes)
+        self.y_test = self.Y_test  # keras.utils.to_categorical(Y_test, num_classes)
+        self.y_validation = self.Y_validation
 
         try:
             # if gpus > 1:
@@ -345,9 +359,9 @@ class Initialization(object):
             if gpus >= 1:
                 with strategy.scope():
                     if version == 2:
-                        model = resnet_v2(input_shape=input_shape, depth=depth)
+                        model = resnet_v2(input_shape=input_shape, depth=depth, num_classes=num_classes)
                     else:
-                        model = resnet_v1(input_shape=input_shape, depth=depth)
+                        model = resnet_v1(input_shape=input_shape, depth=depth, num_classes=num_classes)
 
                     model.summary()
 
@@ -357,9 +371,9 @@ class Initialization(object):
 
             else:
                 if version == 2:
-                    model = resnet_v2(input_shape=input_shape, depth=depth)
+                    model = resnet_v2(input_shape=input_shape, depth=depth, num_classes=num_classes)
                 else:
-                    model = resnet_v1(input_shape=input_shape, depth=depth)
+                    model = resnet_v1(input_shape=input_shape, depth=depth, num_classes=num_classes)
 
                 model.summary()
 
@@ -394,11 +408,11 @@ class Initialization(object):
             # Run training, with or without data augmentation.
             if not self.data_augmentation:
                 print('Not using data augmentation.')
-                self.history = model.fit(x_train, y_train,
+                self.history = model.fit(self.x_train, self.y_train,
                                          batch_size=batch_size,
                                          epochs=epochs,
                                          #              steps_per_epoch=batch_size,
-                                         validation_data=(x_test, y_test),
+                                         validation_data=(self.x_test, self.y_test),
                                          #              validation_steps=1,
                                          shuffle=True,
                                          callbacks=callbacks)
@@ -449,11 +463,11 @@ class Initialization(object):
 
                 # Compute quantities required for featurewise normalization
                 # (std, meadata = adata[:, adata.var['highly_variable']]adata = adata[:, adata.var['highly_variable']]an, and principal components if ZCA whitening is applied).
-                datagen.fit(x_train)
+                datagen.fit(self.x_train)
 
                 # Fit the model on the batches generated by datagen.flow().
-                self.history = model.fit(datagen.flow(x_train, y_train, batch_size=batch_size),
-                                         validation_data=(x_test, y_test),
+                self.history = model.fit(datagen.flow(self.x_train, self.y_train, batch_size=batch_size),
+                                         validation_data=(self.x_test, self.y_test),
                                          epochs=epochs, verbose=1, workers=4,
                                          steps_per_epoch=batch_size,
                                          callbacks=callbacks)
@@ -473,6 +487,8 @@ class Initialization(object):
                 self.models_list.append(file_path)
 
     def analyze(self):
+
+        num_classes = len(self.names)
 
         mpl.rcParams['figure.figsize'] = [8.0, 6.0]
         mpl.rcParams['figure.dpi'] = 80
@@ -513,15 +529,25 @@ class Initialization(object):
         # Test and also validate with an unseen sample dataset
 
         # Validate trained model.
-        scores = self.model.evaluate(x_validation, y_validation, verbose=1)
+        scores = self.model.evaluate(self.x_validation, self.y_validation, verbose=1)
         print('Validation loss:', scores[0])
         print('Validation accuracy:', scores[1])
         # print(scores)
 
+        ## Rerun the tests ##
+
+        self.y_predicted = self.model.predict(self.x_validation, verbose=1)
 
 
+        ##### CONFIDENCE MATRIX #####
 
+        # Prepare a confidence matrix for each threshold by applying various thresholds
 
+        self.y_test_predicted = self.y_predicted
+        self.y_test = self.y_validation
+
+        for threshold in [0.0, 0.1, 0.3, 0.5, 0.7, 0.9]:
+            cm_with_heatmap_for_threshold(self.y_test_predicted, self.y_test, num_classes,threshold=threshold)
 
 
 
@@ -845,3 +871,108 @@ def _get_available_devices():
 
 def let_tansel_know(str):
     print(str)
+
+
+## Get some statistics ##
+
+def spectifity(true_negatives, false_positives):
+    return true_negatives / (true_negatives + false_positives)
+
+
+def sensitivity(true_positives, false_negatives):
+    return true_positives / (true_positives + false_negatives)
+
+
+def confidence_margin(npa):
+    sorted_npa = np.sort(npa)[::-1]  # return sort in reverse, i.e. descending
+    return sorted_npa[0] - sorted_npa[1]
+
+
+# print(confidence_margin([0.0, 1.0, 0.5, 0.0]))
+
+
+def result_for(npa):
+    half = len(npa) // 2
+    return np.argmax(npa[0:half]) == np.argmax(npa[half:])
+
+
+# print(result_for(np.array([0.0, 1.0, 0.5, 0.0, 0.8,0.1, 0.2, 0.1])))
+
+
+def confidence_corr(npa):
+    half = len(npa) // 2
+    res = result_for(npa)
+    cm = confidence_margin(npa[0:half])
+    return res, cm
+
+
+# this totals_for is an alternative way
+'''
+def totals_for(combined_results, treshold=0.5):
+    tt, t_f, th, tl, fh, fl = 0, 0, 0, 0, 0, 0
+    for y in y_val_pred_act:
+        res, cm = confidence_corr(y)
+        if res:
+            tt = tt + 1
+            if cm > treshold:
+                th = th + 1
+            else:
+                tl = tl + 1
+        else:
+            t_f = t_f + 1
+            if cm > treshold:
+                fh = fh + 1
+            else:
+                fl = fl + 1
+    return tt, t_f, th, tl, fh, fl
+'''
+
+
+def vectorise_with_threshold(predictions, threshold):
+    vectorised = []
+    for pred in predictions:
+        if confidence_margin(pred) > threshold:
+            vectorised.append(np.argmax(pred) + 1)
+        else:
+            vectorised.append(0)
+    return np.array(vectorised)
+
+
+def vectorise_selected_with_threshold(predictions, actuals, threshold):
+    vectorised = []
+    vect_act = []
+    for index, pred in enumerate(predictions):
+        if confidence_margin(pred) > threshold:
+            vectorised.append(np.argmax(pred) + 1)
+            vect_act.append(np.argmax(actuals[index]) + 1)
+    return np.array(vectorised), np.array(vect_act)
+
+
+def totals_for(cm_table, num_classes):
+    correct, incorrect = 0, 0
+    for i in range(1, num_classes + 1):
+        for j in range(1, num_classes + 1):
+            if i == j:
+                correct = correct + cm_table[i][j]
+            else:
+                incorrect = incorrect + cm_table[i][j]
+    total = correct + incorrect
+    return total, correct, incorrect, correct / total, incorrect / total
+
+
+def cm_with_heatmap_for_threshold(predicted, actual, num_classes, threshold=0.5):
+    pv = vectorise_with_threshold(predicted, threshold)
+    av = vectorise_with_threshold(actual, threshold)
+    cm = ConfusionMatrix(actual_vector=av, predict_vector=pv)
+    recognised = np.count_nonzero(pv)
+    print("Total=", len(pv), " Classified=", recognised, "Discarded=", len(pv) - recognised, "recovered percent=",
+          recognised / len(pv) * 100, "discarded percent=", (len(pv) - recognised) / len(pv) * 100)
+    cm_table = cm.table
+    print(totals_for(cm_table, num_classes))
+    df_cm = pd.DataFrame(cm_table, index=range(1, num_classes + 1), columns=range(1, num_classes + 1))
+    plt.figure(figsize=(5, 4))
+    ax = plt.axes()
+    ax.set_title("Threshold=" + str(threshold))
+    sn.heatmap(df_cm, annot=True, fmt='g', ax=ax)  # ,annot_kws=annot_kws)# ,mask=mask)
+    plt.savefig("cm_with_heatmap_for_threshold%d" % threshold, format="svg")
+    plt.show()
