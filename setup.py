@@ -5,6 +5,8 @@ VERSION = '0.5.0'
 REQUIRED_PACKAGES = [
     'tensorflow == 2.1.0',
     'scanpy',
+    'pycm==2.5',
+
 ]
 
 PROJECT_NAME = 'skymapping_tools'
