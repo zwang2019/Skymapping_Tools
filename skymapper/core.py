@@ -549,6 +549,98 @@ class Initialization(object):
         for threshold in [0.0, 0.1, 0.3, 0.5, 0.7, 0.9]:
             cm_with_heatmap_for_threshold(self.y_test_predicted, self.y_test, num_classes,threshold=threshold)
 
+        # Learn to predict each class against the other
+
+        y_score = self.y_test_predicted
+        n_classes = num_classes
+        # Compute ROC curve and ROC area for each class
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        for i in range(num_classes):
+            fpr[i], tpr[i], _ = roc_curve(self.y_test[:, i], y_score[:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Compute micro-average ROC curve and ROC area
+        fpr["micro"], tpr["micro"], _ = roc_curve(self.y_test.ravel(), y_score.ravel())
+        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+        ##############################################################################
+        # Plot ROC curves for the subtypes
+
+        # Compute macro-average ROC curve and ROC area
+
+        # First aggregate all false positive rates
+        all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+
+        # Then interpolate all ROC curves at these points
+        mean_tpr = np.zeros_like(all_fpr)
+        for i in range(n_classes):
+            mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+        # Average and compute AUC
+        mean_tpr /= n_classes
+
+        fpr["macro"] = all_fpr
+        tpr["macro"] = mean_tpr
+        roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+
+        # Plot all ROC curves
+        fig = plt.figure(figsize=(8, 8), dpi=120)
+
+        plt.plot(fpr["micro"], tpr["micro"],
+                 label='micro-average ROC (area = %0.2f)'
+                       % roc_auc["micro"],
+                 color='deeppink', linestyle=':', linewidth=4)
+
+        plt.plot(fpr["macro"], tpr["macro"],
+                 label='macro-average ROC (area = %0.2f)'
+                       % roc_auc["macro"],
+                 color='navy', linestyle=':', linewidth=4)
+
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+
+        lw = 2  # line width
+
+        for i, color in zip(range(n_classes), colors):
+            plt.plot(fpr[i], tpr[i], color=color, lw=lw,
+                     label='ROC curve of ' + self.names[i] + ' (area = %0.2f)' % roc_auc[i])
+
+        plt.plot([0, 1], [0, 1], 'k--', lw=lw)
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating curve for subclasses separation')
+        plt.legend(loc="lower right")
+        plt.savefig("ROC.svg", format="svg")
+        plt.show()
+
+        fig = plt.figure(figsize=(6, 6), dpi=120)
+        plt.plot(fpr["micro"], tpr["micro"],
+                 label='micro-average ROC (area = %0.2f)'
+                       % roc_auc["micro"],
+                 color='deeppink', linestyle=':', linewidth=4)
+
+        plt.plot(fpr["macro"], tpr["macro"],
+                 label='macro-average ROC (area = %0.2f)'
+                       % roc_auc["macro"],
+                 color='navy', linestyle=':', linewidth=4)
+
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue'])
+        for i, color in zip(range(n_classes), colors):
+            plt.plot(fpr[i], tpr[i], color=color, lw=lw,
+                     label='ROC curve of ' + self.names[i] + ' (area = %0.2f)' % roc_auc[i])
+        # plt.plot([0, 0.2], [0.8, 1], 'k--', lw=lw)
+        plt.xlim([0.0, 0.3])
+        plt.ylim([0.7, 1.01])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating curve zoomed')
+        plt.legend(loc="lower right")
+        plt.savefig("ROC_Zoomed.svg", format="svg")
+        plt.show()
+
 
 
 
