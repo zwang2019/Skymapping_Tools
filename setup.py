@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
-
-VERSION = '0.5.0'
+import skymapper
 
 REQUIRED_PACKAGES = [
     'tensorflow == 2.1.0',
@@ -14,7 +13,7 @@ PROJECT_NAME = 'skymapping_tools'
 setup(
 
     name = PROJECT_NAME,
-    version = VERSION,
+    version = skymapper.__version__,
     keywords='skymapper machine learning',
     description = 'A tool for sequence data classification',
     license = 'Apache 2.0',
