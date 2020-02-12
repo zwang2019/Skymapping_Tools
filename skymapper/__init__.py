@@ -5,7 +5,12 @@ from .config import VERSION
 __version__ = VERSION
 
 
-originInstance = core.Initialization()
+def new_instance():
+    newInstance = core.Initialization()
+    return newInstance
+
+
+originInstance = new_instance()
 
 # environment setting
 gpu = originInstance.choose_gpu
