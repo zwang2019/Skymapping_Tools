@@ -7,6 +7,8 @@ __version__ = VERSION
 
 originInstance = core.Initialization()
 
+# environment setting
+gpu = originInstance.choose_gpu
 
 # data input
 reader = originInstance.skymapper_read_mtx
