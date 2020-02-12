@@ -548,7 +548,7 @@ class Initialization(object):
         self.y_test_predicted = self.y_predicted
         self.y_test = self.y_validation
 
-        for threshold in [0.0, 0.1, 0.3, 0.5, 0.7, 0.9]:
+        for threshold in [0.9]:                   # should be 0.0, 0.1, 0.3, 0.5, 0.7, as well
             cm_with_heatmap_for_threshold(self.y_test_predicted, self.y_test, num_classes,threshold=threshold)
 
         # Learn to predict each class against the other
