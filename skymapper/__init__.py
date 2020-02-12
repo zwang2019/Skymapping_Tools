@@ -23,6 +23,7 @@ video_maker = originInstance.make_sample_video
 converter = originInstance.prepare
 
 # to train the data
+set_train_size = originInstance.set_train_size
 trainer = originInstance.train
 
 # to analyze the data
