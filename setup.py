@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 VERSION = '0.13.0'
 
 REQUIRED_PACKAGES = [
-    'tensorflow == 2.1.0',
+    'tensorflow == 2.5.1',
     'scanpy',
     'pycm==2.5',
 
